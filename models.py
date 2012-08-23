@@ -6,6 +6,7 @@ from django.utils.encoding import smart_str
 from django.contrib.auth.models import AnonymousUser
 from django.utils.translation import ugettext_lazy as _
 from django.contrib.auth.models import SiteProfileNotAvailable
+from django.core.exceptions import ImproperlyConfigured
 
 try:
     from django.contrib.auth.hashers import check_password, make_password
