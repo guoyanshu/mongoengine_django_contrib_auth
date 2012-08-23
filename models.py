@@ -137,29 +137,30 @@ class User(Document):
         Returns site-specific profile for this user. Raises
         SiteProfileNotAvailable if this site does not allow profiles.
         """
-        from django.conf import settings
+        if not hasattr(self, '_get_profile'):
+            from django.conf import settings
 
-        AUTH_PROFILE_MODULE = getattr(settings, 'AUTH_PROFILE_MODULE', False)
-        assert AUTH_PROFILE_MODULE, SiteProfileNotAvailable(
-            'You need to set AUTH_PROFILE_MODULE in your project settings')
-        try:
-            app_label, model_name = AUTH_PROFILE_MODULE.split('.')
-        except ValueError:
-            raise SiteProfileNotAvailable(
-                'app_label and model_name should be separated by a dot in '
-                'the AUTH_PROFILE_MODULE setting')
-        try:
-            model = getattr(__import__(app_label).models, model_name, None)
-            if model is None:
+            AUTH_PROFILE_MODULE = getattr(settings, 'AUTH_PROFILE_MODULE', False)
+            assert AUTH_PROFILE_MODULE, SiteProfileNotAvailable(
+                'You need to set AUTH_PROFILE_MODULE in your project settings')
+            try:
+                app_label, model_name = AUTH_PROFILE_MODULE.split('.')
+            except ValueError:
                 raise SiteProfileNotAvailable(
-                    'Unable to load the profile model, check '
-                    'AUTH_PROFILE_MODULE in your projectsettings '
-                    'or make sure profile model in models.py')
-            return model.objects.get(user=self)
-        except (ImportError, ImproperlyConfigured):
-            raise SiteProfileNotAvailable
+                    'app_label and model_name should be separated by a dot in '
+                    'the AUTH_PROFILE_MODULE setting')
+            try:
+                model = getattr(__import__(app_label).models, model_name, None)
+                if model is None:
+                    raise SiteProfileNotAvailable(
+                        'Unable to load the profile model, check '
+                        'AUTH_PROFILE_MODULE in your projectsettings '
+                        'or make sure profile model in models.py')
+                self._get_profile = model.objects.get(user=self)
+            except (ImportError, ImproperlyConfigured):
+                raise SiteProfileNotAvailable
 
-        return None
+        return self._get_profile
 
 class MongoEngineBackend(object):
     """Authenticate using MongoEngine and mongoengine_django_contrib_auth.models.User.
