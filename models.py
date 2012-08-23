@@ -5,6 +5,7 @@ from mongoengine import *
 from django.utils.encoding import smart_str
 from django.contrib.auth.models import AnonymousUser
 from django.utils.translation import ugettext_lazy as _
+from django.contrib.auth.models import SiteProfileNotAvailable
 
 try:
     from django.contrib.auth.hashers import check_password, make_password
@@ -129,6 +130,35 @@ class User(Document):
     def get_and_delete_messages(self):
         return []
 
+    def get_profile(self):
+        """
+        not supply for cache
+        Returns site-specific profile for this user. Raises
+        SiteProfileNotAvailable if this site does not allow profiles.
+        """
+        from django.conf import settings
+
+        AUTH_PROFILE_MODULE = getattr(settings, 'AUTH_PROFILE_MODULE', False)
+        assert AUTH_PROFILE_MODULE, SiteProfileNotAvailable(
+            'You need to set AUTH_PROFILE_MODULE in your project settings')
+        try:
+            app_label, model_name = AUTH_PROFILE_MODULE.split('.')
+        except ValueError:
+            raise SiteProfileNotAvailable(
+                'app_label and model_name should be separated by a dot in '
+                'the AUTH_PROFILE_MODULE setting')
+        try:
+            model = getattr(__import__(app_label).models, model_name, None)
+            if model is None:
+                raise SiteProfileNotAvailable(
+                    'Unable to load the profile model, check '
+                    'AUTH_PROFILE_MODULE in your projectsettings '
+                    'or make sure profile model in models.py')
+            return model.objects.get(user=self)
+        except (ImportError, ImproperlyConfigured):
+            raise SiteProfileNotAvailable
+
+        return None
 
 class MongoEngineBackend(object):
     """Authenticate using MongoEngine and mongoengine_django_contrib_auth.models.User.
